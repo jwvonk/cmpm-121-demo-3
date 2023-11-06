@@ -46,9 +46,11 @@ sensorButton.addEventListener("click", () => {
   });
 });
 
-let points = 0;
+let coins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
-statusPanel.innerHTML = "No points yet...";
+statusPanel.innerHTML = "No coins yet...";
+
+const pitValues: Record<string, number> = {};
 
 function makePit(i: number, j: number) {
   const bounds = leaflet.latLngBounds([
@@ -64,19 +66,41 @@ function makePit(i: number, j: number) {
 
   const pit = leaflet.rectangle(bounds) as leaflet.Layer;
 
+  const pitKey = `${i}_${j}`;
+  if (!pitValues[pitKey]) {
+    pitValues[pitKey] = Math.floor(
+      luck([i, j, "initialValue"].toString()) * 100
+    );
+  }
+
   pit.bindPopup(() => {
-    let value = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+    let value = pitValues[pitKey];
     const container = document.createElement("div");
     container.innerHTML = `
-                <div>There is a pit here at "${i},${j}". It has value <span id="value">${value}</span>.</div>
-                <button id="poke">poke</button>`;
-    const poke = container.querySelector<HTMLButtonElement>("#poke")!;
-    poke.addEventListener("click", () => {
-      value--;
-      container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-        value.toString();
-      points++;
-      statusPanel.innerHTML = `${points} points accumulated`;
+                <div>There is a pit here at "${i},${j}". It has <span id="value">${value}</span> coins.</div>
+                <button id="collect">collect</button>
+                <button id="deposit">deposit</button>`;
+    const collect = container.querySelector<HTMLButtonElement>("#collect")!;
+    collect.addEventListener("click", () => {
+      if (value > 0) {
+        value--;
+        container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
+          value.toString();
+        pitValues[pitKey] = value;
+        coins++;
+        statusPanel.innerHTML = `${coins} coins accumulated`;
+      }
+    });
+    const deposit = container.querySelector<HTMLButtonElement>("#deposit")!;
+    deposit.addEventListener("click", () => {
+      if (coins > 0) {
+        value++;
+        container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
+          value.toString();
+        pitValues[pitKey] = value;
+        coins--;
+        statusPanel.innerHTML = `${coins} coins accumulated`;
+      }
     });
     return container;
   });
