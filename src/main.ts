@@ -3,10 +3,10 @@ import "./style.css";
 import leaflet from "leaflet";
 import luck from "./luck";
 import "./leafletWorkaround";
-
-const MERRILL_CLASSROOM = leaflet.latLng({
-  lat: 36.9995,
-  lng: -122.0533,
+import { Board } from "./board";
+const NULL_ISLAND = leaflet.latLng({
+  lat: 0,
+  lng: 0,
 });
 
 const GAMEPLAY_ZOOM_LEVEL = 19;
@@ -17,7 +17,7 @@ const PIT_SPAWN_PROBABILITY = 0.1;
 const mapContainer = document.querySelector<HTMLElement>("#map")!;
 
 const map = leaflet.map(mapContainer, {
-  center: MERRILL_CLASSROOM,
+  center: NULL_ISLAND,
   zoom: GAMEPLAY_ZOOM_LEVEL,
   minZoom: GAMEPLAY_ZOOM_LEVEL,
   maxZoom: GAMEPLAY_ZOOM_LEVEL,
@@ -32,7 +32,7 @@ leaflet
   })
   .addTo(map);
 
-const playerMarker = leaflet.marker(MERRILL_CLASSROOM);
+const playerMarker = leaflet.marker(NULL_ISLAND);
 playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
@@ -53,14 +53,12 @@ statusPanel.innerHTML = "No coins yet...";
 const pitValues: Record<string, number> = {};
 
 function makePit(i: number, j: number) {
+  const currentPos = playerMarker.getLatLng();
   const bounds = leaflet.latLngBounds([
+    [currentPos.lat + i * TILE_DEGREES, currentPos.lng + j * TILE_DEGREES],
     [
-      MERRILL_CLASSROOM.lat + i * TILE_DEGREES,
-      MERRILL_CLASSROOM.lng + j * TILE_DEGREES,
-    ],
-    [
-      MERRILL_CLASSROOM.lat + (i + 1) * TILE_DEGREES,
-      MERRILL_CLASSROOM.lng + (j + 1) * TILE_DEGREES,
+      currentPos.lat + (i + 1) * TILE_DEGREES,
+      currentPos.lng + (j + 1) * TILE_DEGREES,
     ],
   ]);
 
@@ -107,10 +105,20 @@ function makePit(i: number, j: number) {
   pit.addTo(map);
 }
 
-for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-  for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-    if (luck([i, j].toString()) < PIT_SPAWN_PROBABILITY) {
-      makePit(i, j);
-    }
+const board = new Board(TILE_DEGREES, NEIGHBORHOOD_SIZE);
+
+const currentCells = board.getCellsNearPoint(NULL_ISLAND);
+
+for (const cell of currentCells) {
+  if (luck([cell.i, cell.j].toString()) < PIT_SPAWN_PROBABILITY) {
+    makePit(cell.i, cell.j);
   }
 }
+
+// for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
+//   for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
+//     if (luck([i, j].toString()) < PIT_SPAWN_PROBABILITY) {
+//       makePit(i, j);
+//     }
+//   }
+// }
