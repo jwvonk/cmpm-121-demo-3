@@ -46,79 +46,100 @@ sensorButton.addEventListener("click", () => {
   });
 });
 
-let coins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = "No coins yet...";
 
-const pitValues: Record<string, number> = {};
+class Coin {
+  readonly i: number;
+  readonly j: number;
+  readonly serial: number;
 
-function makePit(i: number, j: number) {
-  const currentPos = playerMarker.getLatLng();
-  const bounds = leaflet.latLngBounds([
-    [currentPos.lat + i * TILE_DEGREES, currentPos.lng + j * TILE_DEGREES],
-    [
-      currentPos.lat + (i + 1) * TILE_DEGREES,
-      currentPos.lng + (j + 1) * TILE_DEGREES,
-    ],
-  ]);
-
-  const pit = leaflet.rectangle(bounds) as leaflet.Layer;
-
-  const pitKey = `${i}_${j}`;
-  if (!pitValues[pitKey]) {
-    pitValues[pitKey] = Math.floor(
-      luck([i, j, "initialValue"].toString()) * 100
-    );
+  constructor(i: number, j: number, serial: number) {
+    this.i = i;
+    this.j = j;
+    this.serial = serial;
   }
 
-  pit.bindPopup(() => {
-    let value = pitValues[pitKey];
-    const container = document.createElement("div");
-    container.innerHTML = `
-                <div>There is a pit here at "${i},${j}". It has <span id="value">${value}</span> coins.</div>
-                <button id="collect">collect</button>
-                <button id="deposit">deposit</button>`;
-    const collect = container.querySelector<HTMLButtonElement>("#collect")!;
-    collect.addEventListener("click", () => {
-      if (value > 0) {
-        value--;
-        container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-          value.toString();
-        pitValues[pitKey] = value;
-        coins++;
-        statusPanel.innerHTML = `${coins} coins accumulated`;
-      }
-    });
-    const deposit = container.querySelector<HTMLButtonElement>("#deposit")!;
-    deposit.addEventListener("click", () => {
-      if (coins > 0) {
-        value++;
-        container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-          value.toString();
-        pitValues[pitKey] = value;
-        coins--;
-        statusPanel.innerHTML = `${coins} coins accumulated`;
-      }
-    });
-    return container;
-  });
-  pit.addTo(map);
+  get displayText() {
+    return `${this.i}:${this.j}#${this.serial}`;
+  }
+
+  get id() {
+    return `b${this.i}_${this.j}_${this.serial}`;
+  }
 }
 
 const board = new Board(TILE_DEGREES, NEIGHBORHOOD_SIZE);
+
+const playerCoins: Coin[] = [];
+
+const cacheCoinRegistry = new Map<string, Coin[]>();
+
+function makeCache(i: number, j: number) {
+  const bounds = board.getCellBounds({ i, j });
+
+  const geoCache = leaflet.rectangle(bounds) as leaflet.Layer;
+
+  const cacheKey = `${i},${j}`;
+  let cacheCoins: Coin[];
+  if (!cacheCoinRegistry.has(cacheKey)) {
+    cacheCoins = new Array<Coin>(
+      Math.floor(luck([i, j, "initialValue"].toString()) * 100)
+    );
+    for (let serial = 0; serial < cacheCoins.length; serial++) {
+      cacheCoins[serial] = new Coin(i, j, serial);
+    }
+    cacheCoinRegistry.set(cacheKey, cacheCoins);
+  } else {
+    cacheCoins = cacheCoinRegistry.get(cacheKey)!;
+  }
+
+  geoCache.bindPopup(() => {
+    const container = document.createElement("div");
+    container.style.display = "flex";
+    container.innerHTML += `<div id="playerCoins">(Player Coins)<br></div><hr><div id="cacheCoins">(Cache Coins)<br></div>`;
+
+    const playerCoinsElem =
+      container.querySelector<HTMLDivElement>("#playerCoins")!;
+    for (const coin of playerCoins) {
+      playerCoinsElem.innerHTML += `<div>${coin.displayText} <button id=${coin.id}>></button><br></div>`;
+    }
+
+    const cacheCoinsElem =
+      container.querySelector<HTMLDivElement>("#cacheCoins")!;
+    for (const coin of cacheCoins) {
+      cacheCoinsElem.innerHTML += `<div><button id=${coin.id}><</button> ${coin.displayText}<br></div>`;
+    }
+
+    for (let i = 0; i < playerCoins.length; i++) {
+      const button = playerCoinsElem.querySelector<HTMLButtonElement>(
+        `#${playerCoins[i].id}`
+      )!;
+      button.addEventListener("click", () => {
+        cacheCoins.push(playerCoins.splice(i, 1)[0]);
+        button.parentElement!.remove();
+      });
+    }
+
+    for (let i = 0; i < cacheCoins.length; i++) {
+      const button = cacheCoinsElem.querySelector<HTMLButtonElement>(
+        `#${cacheCoins[i].id}`
+      )!;
+      button.addEventListener("click", () => {
+        playerCoins.push(cacheCoins.splice(i, 1)[0]);
+        button.parentElement!.remove();
+      });
+    }
+
+    return container;
+  });
+  geoCache.addTo(map);
+}
 
 const currentCells = board.getCellsNearPoint(NULL_ISLAND);
 
 for (const cell of currentCells) {
   if (luck([cell.i, cell.j].toString()) < PIT_SPAWN_PROBABILITY) {
-    makePit(cell.i, cell.j);
+    makeCache(cell.i, cell.j);
   }
 }
-
-// for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-//   for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-//     if (luck([i, j].toString()) < PIT_SPAWN_PROBABILITY) {
-//       makePit(i, j);
-//     }
-//   }
-// }

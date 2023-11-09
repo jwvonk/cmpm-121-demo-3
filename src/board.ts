@@ -37,8 +37,11 @@ export class Board {
   }
 
   getCellBounds(cell: Cell): leaflet.LatLngBounds {
-    const sw = leaflet.latLng(cell.i, cell.j);
-    const ne = leaflet.latLng(cell.i + this.tileWidth, cell.j + this.tileWidth);
+    const sw = leaflet.latLng(cell.i * this.tileWidth, cell.j * this.tileWidth);
+    const ne = leaflet.latLng(
+      (cell.i + 1) * this.tileWidth,
+      (cell.j + 1) * this.tileWidth
+    );
     return leaflet.latLngBounds(sw, ne);
   }
 
@@ -46,18 +49,18 @@ export class Board {
     const resultCells: Cell[] = [];
     const originCell = this.getCellForPoint(point);
     for (
-      let i = -this.tileVisibilityRadius;
-      i < this.tileVisibilityRadius;
-      i++
+      let x = -this.tileVisibilityRadius;
+      x < this.tileVisibilityRadius;
+      x++
     ) {
       for (
-        let j = -this.tileVisibilityRadius;
-        j < this.tileVisibilityRadius;
-        j++
+        let y = -this.tileVisibilityRadius;
+        y < this.tileVisibilityRadius;
+        y++
       ) {
-        const lat = originCell.i + i;
-        const lng = originCell.j + j;
-        resultCells.push(this.getCellForPoint(leaflet.latLng(lat, lng)));
+        const i = originCell.i + x;
+        const j = originCell.j + y;
+        resultCells.push(this.getCanonicalCell({ i, j }));
       }
     }
     return resultCells;

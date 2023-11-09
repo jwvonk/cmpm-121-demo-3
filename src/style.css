@@ -48,6 +48,16 @@ h1 {
   height: 100vh;
 }
 
+#playerCoins {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+#cacheCoins {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;
