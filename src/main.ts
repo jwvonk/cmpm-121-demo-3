@@ -65,7 +65,7 @@ class Coin {
   }
 
   get id() {
-    return `b${this.i}_${this.j}_${this.serial}`;
+    return `id${this.i}_${this.j}_${this.serial}`;
   }
 }
 
@@ -94,43 +94,59 @@ function makeCache(i: number, j: number) {
     cacheCoins = cacheCoinRegistry.get(cacheKey)!;
   }
 
+  function hideCoinHTML(elem: HTMLDivElement, coin: Coin) {
+    elem.querySelector<HTMLLIElement>(`#${coin.id}`)!.classList.add("hidden");
+  }
+
+  function revealCoinHTML(elem: HTMLDivElement, coin: Coin) {
+    elem
+      .querySelector<HTMLLIElement>(`#${coin.id}`)!
+      .classList.remove("hidden");
+  }
+
   geoCache.bindPopup(() => {
     const container = document.createElement("div");
     container.style.display = "flex";
-    container.innerHTML += `<div id="playerCoins">(Player Coins)<br></div><hr><div id="cacheCoins">(Cache Coins)<br></div>`;
+    container.style.alignContent = "space-around";
+    container.innerHTML += `<ul id="playerCoins">(Player Coins)</ul><hr><ul id="cacheCoins">(Cache Coins)</ul>`;
 
     const playerCoinsElem =
       container.querySelector<HTMLDivElement>("#playerCoins")!;
-    for (const coin of playerCoins) {
-      playerCoinsElem.innerHTML += `<div>${coin.displayText} <button id=${coin.id}>></button><br></div>`;
-    }
-
     const cacheCoinsElem =
       container.querySelector<HTMLDivElement>("#cacheCoins")!;
+
+    const allCoins = playerCoins.concat(cacheCoins);
+
+    for (const coin of allCoins) {
+      playerCoinsElem.innerHTML += `<li id=${coin.id}><span>${coin.displayText}</span><button id=${coin.id}>></button></li>`;
+      cacheCoinsElem.innerHTML += `<li id=${coin.id}><button id=${coin.id}><</button><span>\t${coin.displayText}</span></li>`;
+    }
+
+    for (const coin of playerCoins) {
+      hideCoinHTML(cacheCoinsElem, coin);
+    }
+
     for (const coin of cacheCoins) {
-      cacheCoinsElem.innerHTML += `<div><button id=${coin.id}><</button> ${coin.displayText}<br></div>`;
+      hideCoinHTML(playerCoinsElem, coin);
     }
 
-    for (let i = 0; i < playerCoins.length; i++) {
-      const button = playerCoinsElem.querySelector<HTMLButtonElement>(
-        `#${playerCoins[i].id}`
+    for (const coin of allCoins) {
+      let button = playerCoinsElem.querySelector<HTMLButtonElement>(
+        `#${coin.id}`
       )!;
       button.addEventListener("click", () => {
-        cacheCoins.push(playerCoins.splice(i, 1)[0]);
-        button.parentElement!.remove();
+        cacheCoins.push(playerCoins.splice(playerCoins.indexOf(coin), 1)[0]);
+        hideCoinHTML(playerCoinsElem, coin);
+        revealCoinHTML(cacheCoinsElem, coin);
       });
-    }
 
-    for (let i = 0; i < cacheCoins.length; i++) {
-      const button = cacheCoinsElem.querySelector<HTMLButtonElement>(
-        `#${cacheCoins[i].id}`
-      )!;
+      button = cacheCoinsElem.querySelector<HTMLButtonElement>(`#${coin.id}`)!;
       button.addEventListener("click", () => {
-        playerCoins.push(cacheCoins.splice(i, 1)[0]);
-        button.parentElement!.remove();
+        playerCoins.push(cacheCoins.splice(cacheCoins.indexOf(coin), 1)[0]);
+        hideCoinHTML(cacheCoinsElem, coin);
+        revealCoinHTML(playerCoinsElem, coin);
       });
     }
-
     return container;
   });
   geoCache.addTo(map);

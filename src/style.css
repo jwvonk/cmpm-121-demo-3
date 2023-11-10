@@ -50,12 +50,16 @@ h1 {
 
 #playerCoins {
   max-height: 150px;
+  width: 150px;
   overflow-y: auto;
+  list-style-type: none;
 }
 
 #cacheCoins {
   max-height: 150px;
+  width: 150px;
   overflow-y: auto;
+  list-style-type: none;
 }
 
 button {
@@ -77,6 +81,10 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+.hidden {
+  display: none;
 }
 
 @media (prefers-color-scheme: light) {
