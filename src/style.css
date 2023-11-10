@@ -50,14 +50,14 @@ h1 {
 
 #playerCoins {
   max-height: 150px;
-  width: 150px;
+  min-width: 200px;
   overflow-y: auto;
   list-style-type: none;
 }
 
 #cacheCoins {
   max-height: 150px;
-  width: 150px;
+  min-width: 200px;
   overflow-y: auto;
   list-style-type: none;
 }
