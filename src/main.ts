@@ -311,6 +311,13 @@ navigator.geolocation.getCurrentPosition((position) => {
     position.coords.longitude
   );
   movePlayer(latLng);
+  navigator.geolocation.watchPosition((position) => {
+    const latLng = leaflet.latLng(
+      position.coords.latitude,
+      position.coords.longitude
+    );
+    movePlayer(latLng);
+  });
 });
 
 movePlayer(NULL_ISLAND);
