@@ -32,61 +32,13 @@ leaflet
   })
   .addTo(map);
 
-const playerMarker = leaflet.marker(NULL_ISLAND);
-playerMarker.bindTooltip("That's you!");
-playerMarker.addTo(map);
-
-const sensorButton = document.querySelector("#sensor")!;
-sensorButton.addEventListener("click", () => {
-  navigator.geolocation.watchPosition((position) => {
-    playerMarker.setLatLng(
-      leaflet.latLng(position.coords.latitude, position.coords.longitude)
-    );
-    generate();
-  });
-});
-
-const northButton = document.querySelector("#north")!;
-northButton.addEventListener("click", () => {
-  const current = playerMarker.getLatLng();
-  playerMarker.setLatLng(
-    leaflet.latLng(current.lat + TILE_DEGREES, current.lng)
-  );
-  generate();
-});
-
-const southButton = document.querySelector("#south")!;
-southButton.addEventListener("click", () => {
-  const current = playerMarker.getLatLng();
-  playerMarker.setLatLng(
-    leaflet.latLng(current.lat - TILE_DEGREES, current.lng)
-  );
-  generate();
-});
-
-const eastButton = document.querySelector("#east")!;
-eastButton.addEventListener("click", () => {
-  const current = playerMarker.getLatLng();
-  playerMarker.setLatLng(
-    leaflet.latLng(current.lat, current.lng + TILE_DEGREES)
-  );
-  generate();
-});
-
-const westButton = document.querySelector("#west")!;
-westButton.addEventListener("click", () => {
-  const current = playerMarker.getLatLng();
-  playerMarker.setLatLng(
-    leaflet.latLng(current.lat, current.lng - TILE_DEGREES)
-  );
-  generate();
-});
-
 interface Coin {
   readonly i: number;
   readonly j: number;
   readonly serial: number;
 }
+
+let playerCoins: Coin[];
 
 class Geocache implements Momento<string> {
   i: number;
@@ -127,11 +79,7 @@ interface Momento<T> {
 
 const board = new Board(TILE_DEGREES, NEIGHBORHOOD_SIZE);
 
-const playerCoins: Coin[] = [];
-
-const cacheMomentos = new Map<string, string>();
-
-const cahceLayers = leaflet.layerGroup().addTo(map);
+const cacheLayers = leaflet.layerGroup().addTo(map);
 
 function makeCache(i: number, j: number) {
   const bounds = board.getCellBounds({ i, j });
@@ -140,11 +88,12 @@ function makeCache(i: number, j: number) {
 
   const cache = new Geocache(i, j);
 
-  if (!cacheMomentos.has(cache.momentoKey)) {
+  const storedMemento = localStorage.getItem(cache.momentoKey);
+  if (!storedMemento) {
     cache.gennerateCoins();
-    cacheMomentos.set(cache.momentoKey, cache.toMomento());
+    localStorage.setItem(cache.momentoKey, cache.toMomento());
   } else {
-    cache.fromMomento(cacheMomentos.get(cache.momentoKey)!);
+    cache.fromMomento(storedMemento);
   }
 
   function displayText(coin: Coin) {
@@ -164,7 +113,6 @@ function makeCache(i: number, j: number) {
       .querySelector<HTMLLIElement>(`#${id(coin)}`)!
       .classList.remove("hidden");
   }
-
   cacheLayer.bindPopup(
     () => {
       const container = document.createElement("div");
@@ -202,9 +150,10 @@ function makeCache(i: number, j: number) {
         )!;
         button.addEventListener("click", () => {
           cache.coins.push(playerCoins.splice(playerCoins.indexOf(coin), 1)[0]);
-          cacheMomentos.set(cache.momentoKey, cache.toMomento());
+          localStorage.setItem(cache.momentoKey, cache.toMomento());
           hideCoinHTML(playerCoinsElem, coin);
           revealCoinHTML(cacheCoinsElem, coin);
+          localStorage.setItem("playerCoins", JSON.stringify(playerCoins));
         });
 
         button = cacheCoinsElem.querySelector<HTMLButtonElement>(
@@ -212,20 +161,139 @@ function makeCache(i: number, j: number) {
         )!;
         button.addEventListener("click", () => {
           playerCoins.push(cache.coins.splice(cache.coins.indexOf(coin), 1)[0]);
-          cacheMomentos.set(cache.momentoKey, cache.toMomento());
+          localStorage.setItem(cache.momentoKey, cache.toMomento());
           hideCoinHTML(cacheCoinsElem, coin);
           revealCoinHTML(playerCoinsElem, coin);
+          localStorage.setItem("playerCoins", JSON.stringify(playerCoins));
         });
       }
       return container;
     },
     { maxWidth: 500 }
   );
-  cahceLayers.addLayer(cacheLayer);
+  cacheLayer.on("popupclose", () => generate());
+  cacheLayers.addLayer(cacheLayer);
+}
+const playerMarker = leaflet.marker(NULL_ISLAND);
+playerMarker.bindTooltip("That's you!");
+playerMarker.addTo(map);
+
+class Path {
+  polys: leaflet.LayerGroup<leaflet.Polyline>;
+  current: leaflet.Polyline;
+  constructor() {
+    this.polys = leaflet
+      .layerGroup()
+      .addTo(map) as leaflet.LayerGroup<leaflet.Polyline>;
+    this.current = leaflet.polyline([], { color: "red" });
+    this.current.addTo(this.polys);
+  }
+  toMomento() {
+    const strings = [];
+    for (const poly of this.polys.getLayers() as leaflet.Polyline[]) {
+      strings.push(JSON.stringify(poly.getLatLngs()));
+    }
+    return JSON.stringify(strings);
+  }
+  fromMomento(momento: string) {
+    this.polys.clearLayers();
+    const strings = JSON.parse(momento) as string[];
+    for (const string of strings) {
+      const poly = leaflet.polyline(JSON.parse(string) as leaflet.LatLng[], {
+        color: "red",
+      });
+      poly.addTo(this.polys);
+    }
+    this.newPoly();
+  }
+
+  newPoly() {
+    this.current = leaflet.polyline([], { color: "red" });
+    this.current.addTo(this.polys);
+  }
 }
 
+const path = new Path();
+
+const storedPlayerPath = localStorage.getItem("path");
+
+if (storedPlayerPath) {
+  path.fromMomento(storedPlayerPath);
+}
+
+function movePlayer(latLng: leaflet.LatLng) {
+  playerMarker.setLatLng(latLng);
+  path.current.addLatLng(latLng);
+  localStorage.setItem("path", path.toMomento());
+  if (cacheLayers.getLayers().every((layer) => !layer.isPopupOpen())) {
+    generate();
+  }
+}
+
+const sensorButton = document.querySelector("#sensor")!;
+sensorButton.addEventListener("click", () => {
+  path.newPoly();
+  navigator.geolocation.watchPosition((position) => {
+    const latLng = leaflet.latLng(
+      position.coords.latitude,
+      position.coords.longitude
+    );
+    movePlayer(latLng);
+  });
+});
+
+const resetButton = document.querySelector("#reset")!;
+resetButton.addEventListener("click", () => {
+  const response = window.prompt("Erase Save Data? [y/n]");
+  if (
+    response == "y" ||
+    response == "yes" ||
+    response == "Yes" ||
+    response == "YES"
+  ) {
+    localStorage.clear();
+    path.polys.clearLayers();
+    path.newPoly();
+    movePlayer(playerMarker.getLatLng());
+    generate();
+  }
+});
+
+const northButton = document.querySelector("#north")!;
+northButton.addEventListener("click", () => {
+  const current = playerMarker.getLatLng();
+  const latLng = leaflet.latLng(current.lat + TILE_DEGREES, current.lng);
+  movePlayer(latLng);
+});
+
+const southButton = document.querySelector("#south")!;
+southButton.addEventListener("click", () => {
+  const current = playerMarker.getLatLng();
+  const latLng = leaflet.latLng(current.lat - TILE_DEGREES, current.lng);
+  movePlayer(latLng);
+});
+
+const eastButton = document.querySelector("#east")!;
+eastButton.addEventListener("click", () => {
+  const current = playerMarker.getLatLng();
+  const latLng = leaflet.latLng(current.lat, current.lng + TILE_DEGREES);
+  movePlayer(latLng);
+});
+
+const westButton = document.querySelector("#west")!;
+westButton.addEventListener("click", () => {
+  const current = playerMarker.getLatLng();
+  const latLng = leaflet.latLng(current.lat, current.lng - TILE_DEGREES);
+  movePlayer(latLng);
+});
+
 function generate() {
-  cahceLayers.clearLayers();
+  const storedPlayerCoins = localStorage.getItem("playerCoins");
+  playerCoins = storedPlayerCoins
+    ? (JSON.parse(storedPlayerCoins) as Coin[])
+    : [];
+
+  cacheLayers.clearLayers();
   map.setView(playerMarker.getLatLng());
   const currentCells = board.getCellsNearPoint(playerMarker.getLatLng());
 
@@ -236,4 +304,14 @@ function generate() {
   }
 }
 
+navigator.geolocation.getCurrentPosition((position) => {
+  path.newPoly();
+  const latLng = leaflet.latLng(
+    position.coords.latitude,
+    position.coords.longitude
+  );
+  movePlayer(latLng);
+});
+
+movePlayer(NULL_ISLAND);
 generate();
