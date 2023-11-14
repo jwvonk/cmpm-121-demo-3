@@ -100,18 +100,24 @@ function makeCache(i: number, j: number) {
     return `${coin.i}:${coin.j}#${coin.serial}`;
   }
 
-  function id(coin: Coin) {
-    return `id${coin.i}_${coin.j}_${coin.serial}`;
+  function buttonId(coin: Coin) {
+    return `b${coin.i}_${coin.j}_${coin.serial}`;
   }
 
-  function hideCoinHTML(elem: HTMLDivElement, coin: Coin) {
-    elem.querySelector<HTMLLIElement>(`#${id(coin)}`)!.classList.add("hidden");
+  function spanId(coin: Coin) {
+    return `s${coin.i}_${coin.j}_${coin.serial}`;
   }
 
-  function revealCoinHTML(elem: HTMLDivElement, coin: Coin) {
+  function hideCoinHTML(elem: HTMLUListElement, coin: Coin) {
     elem
-      .querySelector<HTMLLIElement>(`#${id(coin)}`)!
-      .classList.remove("hidden");
+      .querySelector<HTMLSpanElement>(`#${spanId(coin)}`)!
+      .parentElement!.classList.add("hidden");
+  }
+
+  function revealCoinHTML(elem: HTMLUListElement, coin: Coin) {
+    elem
+      .querySelector<HTMLSpanElement>(`#${spanId(coin)}`)!
+      .parentElement!.classList.remove("hidden");
   }
   cacheLayer.bindPopup(
     () => {
@@ -121,19 +127,23 @@ function makeCache(i: number, j: number) {
       container.innerHTML += `<ul id="playerCoins">(Player Coins)</ul><hr><ul id="cacheCoins">(Cache Coins)</ul>`;
 
       const playerCoinsElem =
-        container.querySelector<HTMLDivElement>("#playerCoins")!;
+        container.querySelector<HTMLUListElement>("#playerCoins")!;
       const cacheCoinsElem =
-        container.querySelector<HTMLDivElement>("#cacheCoins")!;
+        container.querySelector<HTMLUListElement>("#cacheCoins")!;
 
       const allCoins = playerCoins.concat(cache.coins);
 
       for (const coin of allCoins) {
-        playerCoinsElem.innerHTML += `<li id=${id(coin)}><span>${displayText(
+        playerCoinsElem.innerHTML += `<li><span id=${spanId(
           coin
-        )}\t</span><button id=${id(coin)}>></button></li>`;
-        cacheCoinsElem.innerHTML += `<li id=${id(coin)}><button id=${id(
+        )}>${displayText(coin)}\t</span><button id=${buttonId(
           coin
-        )}><</button><span>\t${displayText(coin)}</span></li>`;
+        )}>></button></li>`;
+        cacheCoinsElem.innerHTML += `<li><button id=${buttonId(
+          coin
+        )}><</button><span id=${spanId(coin)}>\t${displayText(
+          coin
+        )}</span></li>`;
       }
 
       for (const coin of playerCoins) {
@@ -146,9 +156,10 @@ function makeCache(i: number, j: number) {
 
       for (const coin of allCoins) {
         let button = playerCoinsElem.querySelector<HTMLButtonElement>(
-          `#${id(coin)}`
+          `#${buttonId(coin)}`
         )!;
         button.addEventListener("click", () => {
+          // ev.stopPropagation();
           cache.coins.push(playerCoins.splice(playerCoins.indexOf(coin), 1)[0]);
           localStorage.setItem(cache.momentoKey, cache.toMomento());
           hideCoinHTML(playerCoinsElem, coin);
@@ -157,14 +168,33 @@ function makeCache(i: number, j: number) {
         });
 
         button = cacheCoinsElem.querySelector<HTMLButtonElement>(
-          `#${id(coin)}`
+          `#${buttonId(coin)}`
         )!;
         button.addEventListener("click", () => {
+          // ev.stopPropagation();
           playerCoins.push(cache.coins.splice(cache.coins.indexOf(coin), 1)[0]);
           localStorage.setItem(cache.momentoKey, cache.toMomento());
           hideCoinHTML(cacheCoinsElem, coin);
           revealCoinHTML(playerCoinsElem, coin);
           localStorage.setItem("playerCoins", JSON.stringify(playerCoins));
+        });
+
+        let span = playerCoinsElem.querySelector<HTMLSpanElement>(
+          `#${spanId(coin)}`
+        )!;
+        span.addEventListener("click", () => {
+          map.setView(
+            leaflet.latLng(coin.i * TILE_DEGREES, coin.j * TILE_DEGREES)
+          );
+        });
+
+        span = cacheCoinsElem.querySelector<HTMLSpanElement>(
+          `#${spanId(coin)}`
+        )!;
+        span.addEventListener("click", () => {
+          map.setView(
+            leaflet.latLng(coin.i * TILE_DEGREES, coin.j * TILE_DEGREES)
+          );
         });
       }
       return container;
